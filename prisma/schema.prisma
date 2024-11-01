@@ -1,0 +1,86 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String             @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?            @unique
+  emailVerified DateTime?
+  image         String?
+  githubId      String?            @unique
+  accounts      Account[]
+  sessions      Session[]
+  ownedRooms    ChatRoom[]         @relation("ChatRoomOwner")
+  memberships   ChatRoomMember[]
+}
+
+model ChatRoom {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  repoName    String
+  repoOwner   String
+  createdAt   DateTime         @default(now())
+  ownerId     String          @db.ObjectId
+  owner       User            @relation("ChatRoomOwner", fields: [ownerId], references: [id])
+  members     ChatRoomMember[]
+  messages    Message[]
+
+  @@unique([repoOwner, repoName])
+}
+
+// Join collection for many-to-many relationship between User and ChatRoom
+model ChatRoomMember {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  chatRoomId String   @db.ObjectId
+  joinedAt   DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chatRoomId])
+}
+
+model Message {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  content    String
+  createdAt  DateTime @default(now())
+  chatRoomId String   @db.ObjectId
+  userId     String   @db.ObjectId
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
+
+  @@index([chatRoomId])
+}
